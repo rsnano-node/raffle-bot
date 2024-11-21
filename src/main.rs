@@ -16,7 +16,7 @@ use gui::run_gui;
 use logic::RaffleLogic;
 use prize_sender::PrizeSender;
 use rand::{thread_rng, RngCore};
-use rsnano_core::RawKey;
+use rsnano_core::{Amount, RawKey};
 use rsnano_nullable_clock::SteadyClock;
 use tokio::time::sleep;
 
@@ -68,6 +68,17 @@ async fn run_ticker(logic: Arc<Mutex<RaffleLogic>>, clock: Arc<SteadyClock>, pri
                 winner.name,
                 winner.account.encode_account()
             );
+            std::process::Command::new("notify-send")
+                .arg("-i")
+                .arg("face-smile-big-symbolic")
+                .arg(format!(
+                    "Congratulations {}! You've just won Ӿ {}",
+                    winner.name,
+                    winner.amount.format_balance(1)
+                ))
+                .output()
+                .unwrap();
+
             prize_sender.send_prize(winner.account, winner.amount).await;
         }
         sleep(Duration::from_secs(1)).await
