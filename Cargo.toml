@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tokio = { version = "1.41.1", features = ["rt"] }
+tokio = { version = "1.41.1", features = ["rt", "process"] }
 youtube_chat = "0.2.1"
 rsnano_core = {git = "https://github.com/rsnano-node/rsnano-node", branch="develop"}
 rsnano_nullable_random = {git = "https://github.com/rsnano-node/rsnano-node", branch="develop"}
@@ -14,4 +14,7 @@ rsnano_rpc_client = {git = "https://github.com/rsnano-node/rsnano-node", branch=
 rand = "0.8.5"
 eframe = "0.29.1"
 serde_json = "1.0.133"
+env_logger = "0.11.5"
+log = "0.4.22"
+anyhow = "1.0.93"
 

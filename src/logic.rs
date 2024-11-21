@@ -1,22 +1,21 @@
-use std::time::Duration;
-
-use rsnano_core::{Account, Amount};
-use rsnano_nullable_clock::Timestamp;
-
 use crate::{
     chat::ChatMessage,
     latest_chat_messages::LatestChatMessages,
     registered_viewers::{RegisteredViewer, ViewerRegistry},
 };
+use rsnano_core::{Account, Amount};
+use rsnano_nullable_clock::Timestamp;
+use std::time::Duration;
 
 #[derive(Default)]
 pub(crate) struct RaffleLogic {
     latest_messages: LatestChatMessages,
     viewer_registry: ViewerRegistry,
     next_raffle: Option<Timestamp>,
+    announcement_made: bool,
 }
 
-static RAFFLE_INTERVAL: Duration = Duration::from_secs(30 * 1);
+static RAFFLE_INTERVAL: Duration = Duration::from_secs(60 * 5);
 
 impl RaffleLogic {
     pub fn handle_chat_message(&mut self, message: ChatMessage) {
@@ -24,7 +23,10 @@ impl RaffleLogic {
             if let Ok(account) = Account::decode_account(word) {
                 self.viewer_registry.add(RegisteredViewer {
                     channel_id: message.author_channel_id.clone(),
-                    name: message.author_name.clone().unwrap(),
+                    name: message
+                        .author_name
+                        .clone()
+                        .unwrap_or_else(|| "no name".to_string()),
                     account,
                 });
             }
@@ -47,28 +49,47 @@ impl RaffleLogic {
         }
     }
 
-    pub fn tick(&mut self, now: Timestamp, random: u32) -> Option<Winner> {
+    pub fn tick(&mut self, now: Timestamp, random: u32) -> Vec<OutputAction> {
+        let mut actions = Vec::new();
         match self.next_raffle {
             None => {
                 self.next_raffle = Some(now + RAFFLE_INTERVAL);
-                None
             }
             Some(next) => {
                 if now >= next {
                     self.next_raffle = Some(now + RAFFLE_INTERVAL);
-                    self.viewer_registry
-                        .pick_random(random)
-                        .map(|viewer| Winner {
-                            name: viewer.name,
-                            amount: Amount::nano(1),
-                            account: viewer.account,
-                        })
-                } else {
-                    None
+                    self.announcement_made = false;
+                    if let Some(winner) = self.viewer_registry.pick_random(random) {
+                        let amount = Amount::nano(1);
+
+                        actions.push(OutputAction::Notify(format!(
+                            "Congratulations {}! You've just won Ӿ {}",
+                            winner.name,
+                            amount.format_balance(1)
+                        )));
+
+                        actions.push(OutputAction::SendToWinner(Winner {
+                            name: winner.name,
+                            amount,
+                            account: winner.account,
+                        }));
+                    }
+                } else if now >= next - Duration::from_secs(30) && !self.announcement_made {
+                    actions.push(OutputAction::Notify(
+                        "Get ready! The next raffle starts in 30 seconds...".to_owned(),
+                    ));
+                    self.announcement_made = true;
                 }
             }
         }
+        actions
     }
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub(crate) enum OutputAction {
+    SendToWinner(Winner),
+    Notify(String),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -126,8 +147,8 @@ mod tests {
     #[test]
     fn tick_empty() {
         let mut app = RaffleLogic::default();
-        let winner = app.tick(Timestamp::new_test_instance(), 1);
-        assert!(winner.is_none());
+        let actions = app.tick(Timestamp::new_test_instance(), 1);
+        assert!(actions.is_empty());
     }
 
     #[test]
@@ -138,15 +159,15 @@ mod tests {
         let account = Account::from(42);
         let msg = ChatMessage::new_test_instance_for_account(account);
         app.handle_chat_message(msg.clone());
-        let winner = app.tick(start + RAFFLE_INTERVAL, 0);
-        assert!(winner.is_some());
+        let actions = app.tick(start + RAFFLE_INTERVAL, 0);
+        assert_eq!(actions.len(), 2);
         assert_eq!(
-            winner.unwrap(),
-            Winner {
+            actions[1],
+            OutputAction::SendToWinner(Winner {
                 name: msg.author_name.unwrap(),
                 amount: Amount::nano(1),
                 account
-            }
+            })
         )
     }
 }

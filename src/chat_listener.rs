@@ -1,4 +1,5 @@
 use crate::chat::ChatMessage;
+use log::info;
 use std::time::Duration;
 use tokio::{spawn, time::interval};
 use youtube_chat::{item::MessageItem, live_chat::LiveChatClientBuilder};
@@ -7,7 +8,7 @@ pub(crate) async fn listen_to_chat<F>(stream_url: String, on_message: F)
 where
     F: Fn(ChatMessage) + Send + Sync + 'static,
 {
-    println!("stream url: '{}'", stream_url);
+    info!("stream url: '{}'", stream_url);
     let mut client = LiveChatClientBuilder::new()
         .url(stream_url)
         .unwrap()
