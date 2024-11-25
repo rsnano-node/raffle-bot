@@ -4,6 +4,7 @@ mod gui;
 mod logic;
 mod participants;
 mod prize_sender;
+mod raffle_runner;
 mod upcoming_raffle_announcement;
 
 use std::{
