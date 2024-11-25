@@ -18,7 +18,7 @@ pub(crate) fn run_gui(logic: Arc<Mutex<RaffleLogic>>, clock: Arc<SteadyClock>) -
         "RsNano Spinner",
         options,
         Box::new(|_| {
-            Ok(Box::new(SpinnerGui {
+            Ok(Box::new(AdminGui {
                 logic,
                 clock,
                 input: String::new(),
@@ -28,13 +28,13 @@ pub(crate) fn run_gui(logic: Arc<Mutex<RaffleLogic>>, clock: Arc<SteadyClock>) -
 }
 
 #[derive(Default)]
-struct SpinnerGui {
+struct AdminGui {
     clock: Arc<SteadyClock>,
     logic: Arc<Mutex<RaffleLogic>>,
     input: String,
 }
 
-impl eframe::App for SpinnerGui {
+impl eframe::App for AdminGui {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         ctx.request_repaint_after_secs(0.5);
         let mut logic = self.logic.lock().unwrap();

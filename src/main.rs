@@ -1,7 +1,6 @@
 mod chat;
 mod chat_listener;
 mod gui;
-mod latest_chat_messages;
 mod logic;
 mod prize_sender;
 mod registered_viewers;
@@ -15,7 +14,7 @@ use std::{
 use chat_listener::listen_to_chat;
 use gui::run_gui;
 use log::{info, warn};
-use logic::{OutputAction, RaffleLogic};
+use logic::{Action, RaffleLogic};
 use prize_sender::PrizeSender;
 use rand::{thread_rng, RngCore};
 use rsnano_core::RawKey;
@@ -68,10 +67,10 @@ async fn run_ticker(logic: Arc<Mutex<RaffleLogic>>, clock: Arc<SteadyClock>, pri
 
         for action in actions {
             match action {
-                OutputAction::Notify(message) => {
+                Action::Notify(message) => {
                     show_notification(message).await;
                 }
-                OutputAction::SendToWinner(winner) => {
+                Action::SendToWinner(winner) => {
                     info!(
                         "We have a winner: {} with address {}",
                         winner.name,

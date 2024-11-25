@@ -1,6 +1,5 @@
 use crate::{
-    chat::ChatMessage,
-    latest_chat_messages::LatestChatMessages,
+    chat::{ChatMessage, LatestChatMessages},
     registered_viewers::{RegisteredViewer, ViewerRegistry},
 };
 use rsnano_core::{Account, Amount};
@@ -16,6 +15,7 @@ pub(crate) struct RaffleLogic {
 }
 
 static RAFFLE_INTERVAL: Duration = Duration::from_secs(60 * 5);
+static ANNOUNCEMENT_OFFSET: Duration = Duration::from_secs(10);
 
 impl RaffleLogic {
     pub fn handle_chat_message(&mut self, message: ChatMessage) {
@@ -49,7 +49,7 @@ impl RaffleLogic {
         }
     }
 
-    pub fn tick(&mut self, now: Timestamp, random: u32) -> Vec<OutputAction> {
+    pub fn tick(&mut self, now: Timestamp, random: u32) -> Vec<Action> {
         let mut actions = Vec::new();
         match self.next_raffle {
             None => {
@@ -62,22 +62,23 @@ impl RaffleLogic {
                     if let Some(winner) = self.viewer_registry.pick_random(random) {
                         let amount = Amount::nano(1);
 
-                        actions.push(OutputAction::Notify(format!(
+                        actions.push(Action::Notify(format!(
                             "Congratulations {}! You've just won Ӿ {}",
                             winner.name,
                             amount.format_balance(1)
                         )));
 
-                        actions.push(OutputAction::SendToWinner(Winner {
+                        actions.push(Action::SendToWinner(Winner {
                             name: winner.name,
                             amount,
                             account: winner.account,
                         }));
                     }
-                } else if now >= next - Duration::from_secs(30) && !self.announcement_made {
-                    actions.push(OutputAction::Notify(
-                        "Get ready! The next raffle starts in 30 seconds...".to_owned(),
-                    ));
+                } else if now >= next - ANNOUNCEMENT_OFFSET && !self.announcement_made {
+                    actions.push(Action::Notify(format!(
+                        "Get ready! The next raffle starts in {} seconds...",
+                        ANNOUNCEMENT_OFFSET.as_secs()
+                    )));
                     self.announcement_made = true;
                 }
             }
@@ -87,7 +88,7 @@ impl RaffleLogic {
 }
 
 #[derive(PartialEq, Eq, Debug)]
-pub(crate) enum OutputAction {
+pub(crate) enum Action {
     SendToWinner(Winner),
     Notify(String),
 }
@@ -163,11 +164,42 @@ mod tests {
         assert_eq!(actions.len(), 2);
         assert_eq!(
             actions[1],
-            OutputAction::SendToWinner(Winner {
+            Action::SendToWinner(Winner {
                 name: msg.author_name.unwrap(),
                 amount: Amount::nano(1),
                 account
             })
         )
+    }
+
+    #[test]
+    fn announce_next_raffle() {
+        let mut app = RaffleLogic::default();
+        let start = Timestamp::new_test_instance();
+        app.tick(start, 0);
+        let announce_time = start + RAFFLE_INTERVAL - ANNOUNCEMENT_OFFSET;
+        assert!(app
+            .tick(announce_time - Duration::from_secs(1), 0)
+            .is_empty());
+        let actions = app.tick(announce_time, 0);
+        assert_eq!(actions.len(), 1);
+        assert_eq!(
+            actions[0],
+            Action::Notify("Get ready! The next raffle starts in 10 seconds...".to_owned())
+        );
+    }
+
+    #[test]
+    fn announce_only_once() {
+        let mut app = RaffleLogic::default();
+        let start = Timestamp::new_test_instance();
+        app.tick(start, 0);
+        let announce_time = start + RAFFLE_INTERVAL - ANNOUNCEMENT_OFFSET;
+        let actions = app.tick(announce_time - Duration::from_secs(1), 0);
+        assert_eq!(actions.len(), 0);
+        let actions = app.tick(announce_time, 0);
+        assert_eq!(actions.len(), 1);
+        let actions = app.tick(announce_time + Duration::from_secs(1), 0);
+        assert_eq!(actions.len(), 0);
     }
 }
