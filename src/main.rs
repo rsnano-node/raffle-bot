@@ -10,10 +10,15 @@ mod upcoming_raffle_announcement;
 use std::{
     ffi::OsStr,
     sync::{Arc, Mutex},
-    time::Duration,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use axum::{routing::get, Router};
+use axum::{
+    extract::State,
+    response::Html,
+    routing::{get, post},
+    Json, Router,
+};
 use chat_listener::listen_to_chat;
 use gui::run_gui;
 use log::{info, warn};
@@ -22,6 +27,7 @@ use prize_sender::PrizeSender;
 use rand::{thread_rng, RngCore};
 use rsnano_core::RawKey;
 use rsnano_nullable_clock::SteadyClock;
+use serde::Serialize;
 use tokio::{net::TcpListener, process::Command, time::sleep};
 
 fn main() -> eframe::Result {
@@ -64,13 +70,49 @@ fn spawn_backend(
 }
 
 async fn run_http_server(logic: Arc<Mutex<RaffleLogic>>) {
-    let app = Router::new().route("/raffle", get(get_raffle));
-    let listener = TcpListener::bind(("0.0.0.0:8080")).await.unwrap();
-    axum::serve(listener, app).await.unwrap()
+    let app = Router::new()
+        .route("/", get(get_html))
+        .route("/raffle", get(get_raffle))
+        .route("/confirm", post(post_confirm))
+        .with_state(logic);
+    let listener = TcpListener::bind("0.0.0.0:8080").await.unwrap();
+    axum::serve(listener, app).await.unwrap();
 }
 
-async fn get_raffle() -> &'static str {
-    "foobar"
+async fn get_html() -> Html<&'static str> {
+    Html(include_str!("index.html"))
+}
+
+#[derive(Serialize)]
+struct SpinInstruction {
+    spin: bool,
+    participants: Vec<String>,
+    winner: usize,
+}
+
+async fn get_raffle(State(logic): State<Arc<Mutex<RaffleLogic>>>) -> Json<SpinInstruction> {
+    let guard = logic.lock().unwrap();
+
+    if let Some(win) = guard.current_win() {
+        let participants = win.participants.clone();
+        let winner = participants.iter().position(|i| i == &win.winner).unwrap();
+        Json(SpinInstruction {
+            spin: true,
+            participants,
+            winner,
+        })
+    } else {
+        Json(SpinInstruction {
+            spin: false,
+            participants: Vec::new(),
+            winner: 0,
+        })
+    }
+}
+
+async fn post_confirm(State(logic): State<Arc<Mutex<RaffleLogic>>>) {
+    let mut guard = logic.lock().unwrap();
+    guard.spin_finished();
 }
 
 async fn run_ticker(logic: Arc<Mutex<RaffleLogic>>, clock: Arc<SteadyClock>, priv_key: RawKey) {

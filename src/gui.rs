@@ -1,12 +1,10 @@
-use std::sync::{Arc, Mutex};
-
+use crate::{chat::ChatMessage, logic::RaffleLogic};
 use eframe::{
     egui::{self, CentralPanel, SidePanel, TopBottomPanel, ViewportBuilder},
     NativeOptions,
 };
 use rsnano_nullable_clock::SteadyClock;
-
-use crate::{chat::ChatMessage, logic::RaffleLogic};
+use std::sync::{Arc, Mutex};
 
 pub(crate) fn run_gui(logic: Arc<Mutex<RaffleLogic>>, clock: Arc<SteadyClock>) -> eframe::Result {
     let options = NativeOptions {
@@ -21,7 +19,8 @@ pub(crate) fn run_gui(logic: Arc<Mutex<RaffleLogic>>, clock: Arc<SteadyClock>) -
             Ok(Box::new(AdminGui {
                 logic,
                 clock,
-                input: String::new(),
+                message: String::new(),
+                user: String::new(),
             }))
         }),
     )
@@ -31,7 +30,8 @@ pub(crate) fn run_gui(logic: Arc<Mutex<RaffleLogic>>, clock: Arc<SteadyClock>) -
 struct AdminGui {
     clock: Arc<SteadyClock>,
     logic: Arc<Mutex<RaffleLogic>>,
-    input: String,
+    message: String,
+    user: String,
 }
 
 impl eframe::App for AdminGui {
@@ -58,14 +58,29 @@ impl eframe::App for AdminGui {
         });
 
         TopBottomPanel::bottom("chat-input").show(ctx, |ui| {
-            ui.text_edit_singleline(&mut self.input);
+            ui.label("User:");
+            ui.text_edit_singleline(&mut self.user);
+            ui.label("Message:");
+            ui.text_edit_singleline(&mut self.message);
             if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                 logic.handle_chat_message(ChatMessage {
-                    message: self.input.clone(),
-                    author_name: Some("APP USER".to_owned()),
-                    author_channel_id: "APP".to_owned(),
+                    message: self.message.clone(),
+                    author_name: Some(self.user.clone()),
+                    author_channel_id: self.user.clone(),
                 });
-                self.input = String::new();
+                self.message = String::new();
+            }
+
+            if ui.button("add test users").clicked() {
+                for user in ["Alice", "Bob", "John", "Jane", "Tom"] {
+                    logic.handle_chat_message(ChatMessage {
+                        author_channel_id: user.to_owned(),
+                        author_name: Some(user.to_owned()),
+                        message:
+                            "nano_1iawmcfwmmdyr7xmnordt71gpnhnao8rsk4nywq5khtmedocaj6bafk4fb8h"
+                                .to_owned(),
+                    });
+                }
             }
         });
 

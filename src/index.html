@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<title>RsNano Raffle</title>
+<script src="https://cdn.jsdelivr.net/npm/spin-wheel@5.0.2/dist/spin-wheel-iife.js"></script>
+<script>
+	var spinning = false;
+	var confirming = false;
+
+	function spin_to_winner(wheel, winner) {
+		const duration = 4000;
+		const revolutions = 8;
+		wheel.spinToItem(winner, duration, true, revolutions, true, null);
+	}
+
+	async function confirm_spin(){
+		const request = new Request("http://localhost:8080/confirm", {
+			method: "POST",
+		});
+
+		const response = await fetch(request);
+		confirming = false;
+		if (!response.ok){
+			throw new Error(`Response status: ${response.status}`);
+		}
+	}
+
+
+	async function poll_backend() {
+		if (spinning || confirming){
+			return;
+		}
+
+		const response = await fetch("http://localhost:8080/raffle");
+		if (!response.ok){
+			throw new Error(`Response status: ${response.status}`);
+		}
+
+		const json = await response.json();
+		if (json.participants.length == 0){
+			return;
+		}
+
+		if (json.spin) {
+			spinning = true;
+			const container = document.querySelector('.wheel-container');
+			container.replaceChildren();
+
+			const items = [];
+			for (const participant of json.participants){
+				items.push({label: participant});
+			}
+
+			const props = { 
+				isInteractive: false,
+				radius: 0.88,
+				itemLabelRadius: 0.92,
+				itemLabelRadiusMax: 0.4,
+				itemLabelRotation: 0,
+				itemLabelBaselineOffset: -0.13,
+				itemLabelFont: 'Pragati Narrow',
+				itemBackgroundColors: ['#c7160c', '#fff'],
+				itemLabelColors: ['#fff', '#000'],
+				rotationSpeedMax: 700,
+				rotationResistance: -70,
+				lineWidth: 0,
+				items: items,
+				onRest: function(){
+					if (spinning){
+						spinning = false;
+						confirming = true;
+						setTimeout(function(){
+							container.replaceChildren();
+							confirm_spin().then(_ => {});
+						}, 2000);
+					}
+				}
+			};
+
+			const wheel = new spinWheel.Wheel(container, props);
+			setTimeout(function() {
+				spin_to_winner(wheel, json.winner);
+			}, 3000);
+		}
+	}
+
+	window.onload = () => {
+		setInterval(poll_backend, 1000);
+	}
+</script>
+<body>
+	<div class="wheel-container"></div>
+</body>
+</html> 

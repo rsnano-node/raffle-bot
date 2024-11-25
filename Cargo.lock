@@ -3212,6 +3212,7 @@ dependencies = [
  "rsnano_nullable_random",
  "rsnano_rpc_client",
  "rsnano_rpc_messages",
+ "serde",
  "serde_json",
  "tokio",
  "youtube_chat",

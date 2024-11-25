@@ -1,7 +1,7 @@
 use crate::{
     chat::{ChatMessage, LatestChatMessages},
     participants::{Participant, ParticipantRegistry},
-    raffle_runner::RaffleRunner,
+    raffle_runner::{RaffleResult, RaffleRunner},
     upcoming_raffle_announcement::UpcomingRaffleAnnouncement,
 };
 use rsnano_core::{Account, Amount};
@@ -14,6 +14,8 @@ pub(crate) struct RaffleLogic {
     participants: ParticipantRegistry,
     raffle_runner: RaffleRunner,
     upcoming_raffle_announcement: UpcomingRaffleAnnouncement,
+    current_win: Option<RaffleResult>,
+    spin_finished: bool,
 }
 
 impl RaffleLogic {
@@ -41,6 +43,14 @@ impl RaffleLogic {
         self.raffle_runner.prize()
     }
 
+    pub fn current_win(&self) -> Option<&RaffleResult> {
+        if self.spin_finished {
+            None
+        } else {
+            self.current_win.as_ref()
+        }
+    }
+
     pub fn latest_messages(&self) -> impl Iterator<Item = &ChatMessage> {
         self.latest_messages.iter()
     }
@@ -58,15 +68,47 @@ impl RaffleLogic {
             .raffle_runner
             .try_run_raffle(&self.participants, now, random);
 
-        if result.raffle_completed {
-            self.upcoming_raffle_announcement.raffle_completed();
+        if result.is_some() {
+            self.spin_finished = false;
+            self.current_win = result;
         }
-        let mut actions = result.actions;
+
+        let mut actions = Vec::new();
+
+        if self.spin_finished {
+            if let Some(win) = self.current_win.take() {
+                actions.extend(self.reward_winner(win));
+                self.spin_finished = false;
+                self.upcoming_raffle_announcement.raffle_completed();
+            }
+        }
+
         actions.extend(
             self.upcoming_raffle_announcement
-                .tick(result.next_raffle, now),
+                .tick(self.raffle_runner.next_raffle(now), now),
         );
+
         actions
+    }
+
+    pub fn spin_finished(&mut self) {
+        self.spin_finished = true;
+    }
+
+    fn reward_winner(&self, result: RaffleResult) -> Vec<Action> {
+        let notify = Action::Notify(format!(
+            "Congratulations {}! You've just won Ӿ {}",
+            result.winner,
+            result.prize.format_balance(1)
+        ));
+
+        let send_prize = Action::SendToWinner(Winner {
+            name: result.winner,
+            prize: result.prize,
+            account: result.destination,
+        });
+
+        vec![notify, send_prize]
     }
 }
 
@@ -142,17 +184,32 @@ mod tests {
         logic.tick(start, 0);
         let account = Account::from(42);
         let msg = ChatMessage::new_test_instance_for_account(account);
+        let viewer = msg.author_name.as_ref().unwrap().clone();
         logic.handle_chat_message(msg.clone());
         let actions = logic.tick(start + logic.raffle_interval(), 0);
-        assert!(actions.len() > 0);
+        assert_eq!(actions.len(), 0);
+        assert_eq!(
+            logic.current_win(),
+            Some(&RaffleResult {
+                winner: viewer.clone(),
+                participants: vec![viewer.clone()],
+                prize: logic.prize(),
+                destination: account
+            })
+        );
+        logic.spin_finished();
+
+        let actions = logic.tick(start + logic.raffle_interval(), 0);
+        assert!(actions.len() > 1);
         assert_eq!(
             actions.last().unwrap(),
             &Action::SendToWinner(Winner {
-                name: msg.author_name.unwrap(),
+                name: viewer,
                 prize: logic.prize(),
                 account
             })
-        )
+        );
+        assert!(logic.current_win().is_none());
     }
 
     #[test]
