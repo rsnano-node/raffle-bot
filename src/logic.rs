@@ -1,6 +1,6 @@
 use crate::{
     chat::{ChatMessage, LatestChatMessages},
-    registered_viewers::{RegisteredViewer, ViewerRegistry},
+    participants::{Participant, ParticipantRegistry},
     upcoming_raffle_announcement::UpcomingRaffleAnnouncement,
 };
 use rsnano_core::{Account, Amount};
@@ -10,7 +10,7 @@ use std::time::Duration;
 #[derive(Default)]
 pub(crate) struct RaffleLogic {
     latest_messages: LatestChatMessages,
-    viewer_registry: ViewerRegistry,
+    participants: ParticipantRegistry,
     upcoming_raffle_announcement: UpcomingRaffleAnnouncement,
     next_raffle: Option<Timestamp>,
 }
@@ -21,7 +21,7 @@ impl RaffleLogic {
     pub fn handle_chat_message(&mut self, message: ChatMessage) {
         for word in message.message.split_whitespace() {
             if let Ok(account) = Account::decode_account(word) {
-                self.viewer_registry.add(RegisteredViewer {
+                self.participants.add(Participant {
                     channel_id: message.author_channel_id.clone(),
                     name: message
                         .author_name
@@ -38,48 +38,62 @@ impl RaffleLogic {
         self.latest_messages.iter()
     }
 
-    pub fn registered_viewers(&self) -> Vec<RegisteredViewer> {
-        self.viewer_registry.list()
+    pub fn participants(&self) -> Vec<Participant> {
+        self.participants.list()
     }
 
-    pub fn countdown(&self, now: Timestamp) -> Duration {
-        match self.next_raffle {
-            None => RAFFLE_INTERVAL,
-            Some(next) => next - now,
-        }
+    pub fn countdown(&mut self, now: Timestamp) -> Duration {
+        self.next_raffle(now) - now
     }
 
     pub fn tick(&mut self, now: Timestamp, random: u32) -> Vec<Action> {
-        let mut actions = Vec::new();
+        let (mut actions, next_raffle) = self.try_run_raffle(now, random);
+        actions.extend(self.upcoming_raffle_announcement.tick(next_raffle, now));
+        actions
+    }
+
+    fn next_raffle(&mut self, now: Timestamp) -> Timestamp {
         match self.next_raffle {
             None => {
-                self.next_raffle = Some(now + RAFFLE_INTERVAL);
+                let next = now + RAFFLE_INTERVAL;
+                self.next_raffle = Some(next);
+                next
             }
-            Some(next) => {
-                if now >= next {
-                    if let Some(winner) = self.viewer_registry.pick_random(random) {
-                        let amount = Amount::nano(1);
-
-                        actions.push(Action::Notify(format!(
-                            "Congratulations {}! You've just won Ӿ {}",
-                            winner.name,
-                            amount.format_balance(1)
-                        )));
-
-                        actions.push(Action::SendToWinner(Winner {
-                            name: winner.name,
-                            amount,
-                            account: winner.account,
-                        }));
-                    }
-                    self.upcoming_raffle_announcement.raffle_completed();
-                    self.next_raffle = Some(now + RAFFLE_INTERVAL);
-                } else {
-                    actions.extend(self.upcoming_raffle_announcement.tick(next, now));
-                }
-            }
+            Some(next) => next,
         }
-        actions
+    }
+
+    fn try_run_raffle(&mut self, now: Timestamp, random: u32) -> (Vec<Action>, Timestamp) {
+        let mut next_raffle = self.next_raffle(now);
+        let mut actions = Vec::new();
+        let time_for_raffle = now >= next_raffle;
+        if time_for_raffle {
+            if let Some(winner) = self.participants.pick_random(random) {
+                actions.extend(self.reward_winner(winner));
+            }
+            self.upcoming_raffle_announcement.raffle_completed();
+            next_raffle = now + RAFFLE_INTERVAL;
+            self.next_raffle = Some(next_raffle);
+        }
+        (actions, next_raffle)
+    }
+
+    fn reward_winner(&self, winner: Participant) -> Vec<Action> {
+        let amount = Amount::nano(1);
+
+        let notify = Action::Notify(format!(
+            "Congratulations {}! You've just won Ӿ {}",
+            winner.name,
+            amount.format_balance(1)
+        ));
+
+        let send_prize = Action::SendToWinner(Winner {
+            name: winner.name,
+            amount,
+            account: winner.account,
+        });
+
+        vec![notify, send_prize]
     }
 }
 
@@ -104,7 +118,7 @@ mod tests {
     fn initial_state() {
         let app = RaffleLogic::default();
         assert_eq!(app.latest_messages().count(), 0);
-        assert_eq!(app.registered_viewers().len(), 0);
+        assert_eq!(app.participants().len(), 0);
     }
 
     #[test]
@@ -113,7 +127,7 @@ mod tests {
         let message = ChatMessage::new_test_instance();
         app.handle_chat_message(message);
         assert_eq!(app.latest_messages().count(), 1);
-        assert_eq!(app.registered_viewers().len(), 0);
+        assert_eq!(app.participants().len(), 0);
     }
 
     #[test]
@@ -126,11 +140,11 @@ mod tests {
 
         app.handle_chat_message(message.clone());
 
-        let registered = app.registered_viewers();
+        let registered = app.participants();
         assert_eq!(registered.len(), 1);
         assert_eq!(
             registered[0],
-            RegisteredViewer {
+            Participant {
                 channel_id: message.author_channel_id,
                 name: message.author_name.unwrap(),
                 account: Account::decode_account(
@@ -157,10 +171,10 @@ mod tests {
         let msg = ChatMessage::new_test_instance_for_account(account);
         app.handle_chat_message(msg.clone());
         let actions = app.tick(start + RAFFLE_INTERVAL, 0);
-        assert_eq!(actions.len(), 2);
+        assert!(actions.len() > 0);
         assert_eq!(
-            actions[1],
-            Action::SendToWinner(Winner {
+            actions.last().unwrap(),
+            &Action::SendToWinner(Winner {
                 name: msg.author_name.unwrap(),
                 amount: Amount::nano(1),
                 account

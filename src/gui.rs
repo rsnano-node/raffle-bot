@@ -43,10 +43,10 @@ impl eframe::App for AdminGui {
             .exact_width(300.0)
             .resizable(false)
             .show(ctx, |ui| {
-                let viewers = logic.registered_viewers();
-                ui.heading(format!("Participants ({})", viewers.len()));
-                for viewer in viewers {
-                    ui.label(viewer.name);
+                let participants = logic.participants();
+                ui.heading(format!("Participants ({})", participants.len()));
+                for participant in participants {
+                    ui.label(participant.name);
                 }
             });
 

@@ -2,8 +2,8 @@ mod chat;
 mod chat_listener;
 mod gui;
 mod logic;
+mod participants;
 mod prize_sender;
-mod registered_viewers;
 mod upcoming_raffle_announcement;
 
 use std::{
