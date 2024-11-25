@@ -34,6 +34,10 @@ impl RaffleRunner {
         RAFFLE_INTERVAL
     }
 
+    pub fn prize(&self) -> Amount {
+        Amount::kxrb(10)
+    }
+
     pub fn try_run_raffle(
         &mut self,
         participants: &ParticipantRegistry,
@@ -59,17 +63,16 @@ impl RaffleRunner {
     }
 
     fn reward_winner(&self, winner: Participant) -> Vec<Action> {
-        let amount = Amount::nano(1);
-
+        let prize = self.prize();
         let notify = Action::Notify(format!(
             "Congratulations {}! You've just won Ӿ {}",
             winner.name,
-            amount.format_balance(1)
+            prize.format_balance(1)
         ));
 
         let send_prize = Action::SendToWinner(Winner {
             name: winner.name,
-            amount,
+            prize,
             account: winner.account,
         });
 

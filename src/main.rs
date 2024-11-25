@@ -13,6 +13,7 @@ use std::{
     time::Duration,
 };
 
+use axum::{routing::get, Router};
 use chat_listener::listen_to_chat;
 use gui::run_gui;
 use log::{info, warn};
@@ -21,7 +22,7 @@ use prize_sender::PrizeSender;
 use rand::{thread_rng, RngCore};
 use rsnano_core::RawKey;
 use rsnano_nullable_clock::SteadyClock;
-use tokio::{process::Command, time::sleep};
+use tokio::{net::TcpListener, process::Command, time::sleep};
 
 fn main() -> eframe::Result {
     env_logger::init();
@@ -48,7 +49,10 @@ fn spawn_backend(
             .unwrap();
 
         let logic2 = logic.clone();
-        rt.spawn(async move { run_ticker(logic2.clone(), clock, priv_key).await });
+        let logic3 = logic.clone();
+        rt.spawn(async move { run_ticker(logic2, clock, priv_key).await });
+
+        rt.spawn(run_http_server(logic3));
 
         rt.block_on(async move {
             listen_to_chat(stream_url, move |msg| {
@@ -57,6 +61,16 @@ fn spawn_backend(
             .await;
         });
     });
+}
+
+async fn run_http_server(logic: Arc<Mutex<RaffleLogic>>) {
+    let app = Router::new().route("/raffle", get(get_raffle));
+    let listener = TcpListener::bind(("0.0.0.0:8080")).await.unwrap();
+    axum::serve(listener, app).await.unwrap()
+}
+
+async fn get_raffle() -> &'static str {
+    "foobar"
 }
 
 async fn run_ticker(logic: Arc<Mutex<RaffleLogic>>, clock: Arc<SteadyClock>, priv_key: RawKey) {
@@ -79,7 +93,7 @@ async fn run_ticker(logic: Arc<Mutex<RaffleLogic>>, clock: Arc<SteadyClock>, pri
                         winner.account.encode_account()
                     );
 
-                    match prize_sender.send_prize(winner.account, winner.amount).await {
+                    match prize_sender.send_prize(winner.account, winner.prize).await {
                         Ok(_) => info!("Prize sent!"),
                         Err(e) => warn!("Could not send prize: {:?}", e),
                     }

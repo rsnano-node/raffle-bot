@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use anyhow::anyhow;
 use log::info;
 use rsnano_core::{
@@ -8,6 +6,7 @@ use rsnano_core::{
 };
 use rsnano_rpc_client::NanoRpcClient;
 use rsnano_rpc_messages::{AccountInfoArgs, BlockSubTypeDto, ProcessArgs};
+use std::time::Duration;
 use tokio::task::spawn_blocking;
 
 pub(crate) struct PrizeSender {
@@ -24,7 +23,7 @@ impl PrizeSender {
     pub(crate) async fn send_prize(
         &self,
         destination: Account,
-        amount: Amount,
+        prize: Amount,
     ) -> anyhow::Result<()> {
         let rpc = NanoRpcClient::new("http://[::1]:7076".parse()?);
         let info = rpc
@@ -53,7 +52,7 @@ impl PrizeSender {
             info.representative
                 .ok_or_else(|| anyhow!("no rep field!"))?
                 .into(),
-            info.balance - amount,
+            info.balance - prize,
             destination.into(),
             &self.sender_keys,
             work,

@@ -37,6 +37,10 @@ impl RaffleLogic {
         self.raffle_runner.raffle_interval()
     }
 
+    pub fn prize(&self) -> Amount {
+        self.raffle_runner.prize()
+    }
+
     pub fn latest_messages(&self) -> impl Iterator<Item = &ChatMessage> {
         self.latest_messages.iter()
     }
@@ -75,7 +79,7 @@ pub(crate) enum Action {
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Winner {
     pub name: String,
-    pub amount: Amount,
+    pub prize: Amount,
     pub account: Account,
 }
 
@@ -133,19 +137,19 @@ mod tests {
 
     #[test]
     fn pick_single_winner() {
-        let mut app = RaffleLogic::default();
+        let mut logic = RaffleLogic::default();
         let start = Timestamp::new_test_instance();
-        app.tick(start, 0);
+        logic.tick(start, 0);
         let account = Account::from(42);
         let msg = ChatMessage::new_test_instance_for_account(account);
-        app.handle_chat_message(msg.clone());
-        let actions = app.tick(start + app.raffle_interval(), 0);
+        logic.handle_chat_message(msg.clone());
+        let actions = logic.tick(start + logic.raffle_interval(), 0);
         assert!(actions.len() > 0);
         assert_eq!(
             actions.last().unwrap(),
             &Action::SendToWinner(Winner {
                 name: msg.author_name.unwrap(),
-                amount: Amount::nano(1),
+                prize: logic.prize(),
                 account
             })
         )
