@@ -60,7 +60,12 @@ impl RaffleLogic {
     }
 
     pub fn countdown(&mut self, now: Timestamp) -> Duration {
-        self.raffle_runner.next_raffle(now) - now
+        let next = self.raffle_runner.next_raffle(now);
+        if now >= next {
+            Duration::ZERO
+        } else {
+            next - now
+        }
     }
 
     pub fn tick(&mut self, now: Timestamp, random: u32) -> Vec<Action> {

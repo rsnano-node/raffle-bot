@@ -5,11 +5,12 @@
 <script>
 	var spinning = false;
 	var confirming = false;
+	var overlay;
 
 	function spin_to_winner(wheel, winner) {
 		const duration = 4000;
-		const revolutions = 8;
-		wheel.spinToItem(winner, duration, true, revolutions, true, null);
+		const revolutions = 3;
+		wheel.spinToItem(winner, duration, true, revolutions, 1, null);
 	}
 
 	async function confirm_spin(){
@@ -24,8 +25,14 @@
 		}
 	}
 
-
 	async function poll_backend() {
+		if (overlay === undefined) {
+			overlay = new Image();
+			overlay.src = "http://localhost:8080/overlay.svg";
+			await overlay.decode();
+		}
+
+
 		if (spinning || confirming){
 			return;
 		}
@@ -60,9 +67,8 @@
 				itemLabelFont: 'Pragati Narrow',
 				itemBackgroundColors: ['#c7160c', '#fff'],
 				itemLabelColors: ['#fff', '#000'],
-				rotationSpeedMax: 700,
-				rotationResistance: -70,
 				lineWidth: 0,
+				overlayImage: overlay,
 				items: items,
 				onRest: function(){
 					if (spinning){

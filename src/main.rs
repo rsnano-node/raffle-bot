@@ -15,7 +15,8 @@ use std::{
 
 use axum::{
     extract::State,
-    response::Html,
+    http::{header, HeaderMap},
+    response::{Html, IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
@@ -74,6 +75,7 @@ async fn run_http_server(logic: Arc<Mutex<RaffleLogic>>) {
         .route("/", get(get_html))
         .route("/raffle", get(get_raffle))
         .route("/confirm", post(post_confirm))
+        .route("/overlay.svg", get(get_overlay))
         .with_state(logic);
     let listener = TcpListener::bind("0.0.0.0:8080").await.unwrap();
     axum::serve(listener, app).await.unwrap();
@@ -81,6 +83,12 @@ async fn run_http_server(logic: Arc<Mutex<RaffleLogic>>) {
 
 async fn get_html() -> Html<&'static str> {
     Html(include_str!("index.html"))
+}
+
+async fn get_overlay() -> impl IntoResponse {
+    let mut headers = HeaderMap::new();
+    headers.insert(header::CONTENT_TYPE, "image/svg+xml".parse().unwrap());
+    (headers, include_str!("overlay.svg"))
 }
 
 #[derive(Serialize)]
@@ -122,6 +130,15 @@ async fn run_ticker(logic: Arc<Mutex<RaffleLogic>>, clock: Arc<SteadyClock>, pri
             .lock()
             .unwrap()
             .tick(clock.now(), thread_rng().next_u32());
+
+        if let Some(winner) = logic
+            .lock()
+            .unwrap()
+            .current_win()
+            .map(|w| w.winner.clone())
+        {
+            info!("CURRENT WINNER: {}", winner);
+        }
 
         for action in actions {
             match action {
