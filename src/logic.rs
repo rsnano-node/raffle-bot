@@ -1,6 +1,7 @@
 use crate::{
     chat::{ChatMessage, LatestChatMessages},
     registered_viewers::{RegisteredViewer, ViewerRegistry},
+    upcoming_raffle_announcement::UpcomingRaffleAnnouncement,
 };
 use rsnano_core::{Account, Amount};
 use rsnano_nullable_clock::Timestamp;
@@ -10,12 +11,11 @@ use std::time::Duration;
 pub(crate) struct RaffleLogic {
     latest_messages: LatestChatMessages,
     viewer_registry: ViewerRegistry,
+    upcoming_raffle_announcement: UpcomingRaffleAnnouncement,
     next_raffle: Option<Timestamp>,
-    announcement_made: bool,
 }
 
 static RAFFLE_INTERVAL: Duration = Duration::from_secs(60 * 5);
-static ANNOUNCEMENT_OFFSET: Duration = Duration::from_secs(10);
 
 impl RaffleLogic {
     pub fn handle_chat_message(&mut self, message: ChatMessage) {
@@ -57,8 +57,6 @@ impl RaffleLogic {
             }
             Some(next) => {
                 if now >= next {
-                    self.next_raffle = Some(now + RAFFLE_INTERVAL);
-                    self.announcement_made = false;
                     if let Some(winner) = self.viewer_registry.pick_random(random) {
                         let amount = Amount::nano(1);
 
@@ -74,12 +72,10 @@ impl RaffleLogic {
                             account: winner.account,
                         }));
                     }
-                } else if now >= next - ANNOUNCEMENT_OFFSET && !self.announcement_made {
-                    actions.push(Action::Notify(format!(
-                        "Get ready! The next raffle starts in {} seconds...",
-                        ANNOUNCEMENT_OFFSET.as_secs()
-                    )));
-                    self.announcement_made = true;
+                    self.upcoming_raffle_announcement.raffle_completed();
+                    self.next_raffle = Some(now + RAFFLE_INTERVAL);
+                } else {
+                    actions.extend(self.upcoming_raffle_announcement.tick(next, now));
                 }
             }
         }
@@ -177,7 +173,7 @@ mod tests {
         let mut app = RaffleLogic::default();
         let start = Timestamp::new_test_instance();
         app.tick(start, 0);
-        let announce_time = start + RAFFLE_INTERVAL - ANNOUNCEMENT_OFFSET;
+        let announce_time = start + RAFFLE_INTERVAL - app.upcoming_raffle_announcement.offset();
         assert!(app
             .tick(announce_time - Duration::from_secs(1), 0)
             .is_empty());
@@ -194,7 +190,7 @@ mod tests {
         let mut app = RaffleLogic::default();
         let start = Timestamp::new_test_instance();
         app.tick(start, 0);
-        let announce_time = start + RAFFLE_INTERVAL - ANNOUNCEMENT_OFFSET;
+        let announce_time = start + RAFFLE_INTERVAL - app.upcoming_raffle_announcement.offset();
         let actions = app.tick(announce_time - Duration::from_secs(1), 0);
         assert_eq!(actions.len(), 0);
         let actions = app.tick(announce_time, 0);

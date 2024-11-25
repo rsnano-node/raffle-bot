@@ -4,6 +4,7 @@ mod gui;
 mod logic;
 mod prize_sender;
 mod registered_viewers;
+mod upcoming_raffle_announcement;
 
 use std::{
     ffi::OsStr,
