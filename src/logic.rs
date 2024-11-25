@@ -35,8 +35,20 @@ impl RaffleLogic {
         self.latest_messages.add(message);
     }
 
+    pub fn set_prize(&mut self, prize: Amount) {
+        self.raffle_runner.set_prize(prize);
+    }
+
     pub fn raffle_interval(&self) -> Duration {
         self.raffle_runner.raffle_interval()
+    }
+
+    pub fn set_raffle_interval(&mut self, interval: Duration) {
+        self.raffle_runner.set_raffle_interval(interval);
+    }
+
+    pub fn run_raffle_now(&mut self, now: Timestamp) {
+        self.raffle_runner.run_raffle_now(now);
     }
 
     pub fn prize(&self) -> Amount {
@@ -104,7 +116,7 @@ impl RaffleLogic {
         let notify = Action::Notify(format!(
             "Congratulations {}! You've just won Ӿ {}",
             result.winner,
-            result.prize.format_balance(1)
+            result.prize.format_balance(2)
         ));
 
         let send_prize = Action::SendToWinner(Winner {

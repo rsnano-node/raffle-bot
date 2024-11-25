@@ -3,9 +3,20 @@ use rsnano_core::{Account, Amount};
 use rsnano_nullable_clock::Timestamp;
 use std::time::Duration;
 
-#[derive(Default)]
 pub(crate) struct RaffleRunner {
     next_raffle: Option<Timestamp>,
+    prize: Amount,
+    interval: Duration,
+}
+
+impl Default for RaffleRunner {
+    fn default() -> Self {
+        Self {
+            next_raffle: None,
+            prize: Amount::nano(1),
+            interval: DEFAULT_RAFFLE_INTERVAL,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -17,10 +28,14 @@ pub(crate) struct RaffleResult {
 }
 
 impl RaffleRunner {
+    pub fn set_prize(&mut self, prize: Amount) {
+        self.prize = prize;
+    }
+
     pub fn next_raffle(&mut self, now: Timestamp) -> Timestamp {
         match self.next_raffle {
             None => {
-                let next = now + RAFFLE_INTERVAL;
+                let next = now + self.interval;
                 self.next_raffle = Some(next);
                 next
             }
@@ -29,11 +44,19 @@ impl RaffleRunner {
     }
 
     pub fn raffle_interval(&self) -> Duration {
-        RAFFLE_INTERVAL
+        self.interval
+    }
+
+    pub fn set_raffle_interval(&mut self, interval: Duration) {
+        self.interval = interval;
+    }
+
+    pub fn run_raffle_now(&mut self, now: Timestamp) {
+        self.next_raffle = Some(now);
     }
 
     pub fn prize(&self) -> Amount {
-        Amount::kxrb(10)
+        self.prize
     }
 
     pub fn try_run_raffle(
@@ -63,4 +86,4 @@ impl RaffleRunner {
     }
 }
 
-static RAFFLE_INTERVAL: Duration = Duration::from_secs(60 * 5);
+static DEFAULT_RAFFLE_INTERVAL: Duration = Duration::from_secs(60 * 5);

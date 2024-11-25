@@ -72,15 +72,21 @@ impl eframe::App for AdminGui {
             }
 
             if ui.button("add test users").clicked() {
-                for user in ["Alice", "Bob", "John", "Jane", "Tom"] {
-                    logic.handle_chat_message(ChatMessage {
-                        author_channel_id: user.to_owned(),
-                        author_name: Some(user.to_owned()),
-                        message:
-                            "nano_1iawmcfwmmdyr7xmnordt71gpnhnao8rsk4nywq5khtmedocaj6bafk4fb8h"
-                                .to_owned(),
-                    });
+                for i in 1..5 {
+                    for name in ["Alice", "Bob", "John", "Jane", "Tom"] {
+                        let user = format!("{}{}", name, i);
+                        logic.handle_chat_message(ChatMessage {
+                            author_channel_id: user.clone(),
+                            author_name: Some(user.clone()),
+                            message:
+                                "nano_1iawmcfwmmdyr7xmnordt71gpnhnao8rsk4nywq5khtmedocaj6bafk4fb8h"
+                                    .to_owned(),
+                        });
+                    }
                 }
+            }
+            if ui.button("run raffle now").clicked() {
+                logic.run_raffle_now(self.clock.now());
             }
         });
 

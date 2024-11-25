@@ -10,13 +10,13 @@ mod upcoming_raffle_announcement;
 use std::{
     ffi::OsStr,
     sync::{Arc, Mutex},
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::Duration,
 };
 
 use axum::{
     extract::State,
     http::{header, HeaderMap},
-    response::{Html, IntoResponse, Response},
+    response::{Html, IntoResponse},
     routing::{get, post},
     Json, Router,
 };
@@ -26,7 +26,7 @@ use log::{info, warn};
 use logic::{Action, RaffleLogic};
 use prize_sender::PrizeSender;
 use rand::{thread_rng, RngCore};
-use rsnano_core::RawKey;
+use rsnano_core::{Amount, PublicKey, RawKey};
 use rsnano_nullable_clock::SteadyClock;
 use serde::Serialize;
 use tokio::{net::TcpListener, process::Command, time::sleep};
@@ -34,10 +34,32 @@ use tokio::{net::TcpListener, process::Command, time::sleep};
 fn main() -> eframe::Result {
     env_logger::init();
     let stream_url = std::env::var("STREAM_URL").unwrap();
+    info!("using stream url: {}", stream_url);
     let priv_key = std::env::var("NANO_PRV_KEY").unwrap();
     let priv_key = RawKey::decode_hex(priv_key).unwrap();
-
-    let logic = Arc::new(Mutex::new(RaffleLogic::default()));
+    info!(
+        "using account: {}",
+        PublicKey::try_from(&priv_key)
+            .unwrap()
+            .as_account()
+            .encode_account()
+    );
+    let prize = std::env::var("NANO_PRIZE")
+        .ok()
+        .map(|s| Amount::decode_dec(s).unwrap());
+    let interval = std::env::var("RAFFLE_INTERVAL")
+        .ok()
+        .map(|s| s.parse::<u64>().unwrap());
+    let mut logic = RaffleLogic::default();
+    if let Some(prize) = prize {
+        info!("using prize of {}", prize.format_balance(2));
+        logic.set_prize(prize);
+    }
+    if let Some(interval) = interval {
+        info!("using interval of {}s", interval);
+        logic.set_raffle_interval(Duration::from_secs(interval));
+    }
+    let logic = Arc::new(Mutex::new(logic));
     let clock = Arc::new(SteadyClock::default());
     spawn_backend(logic.clone(), clock.clone(), stream_url, priv_key);
     run_gui(logic, clock)
