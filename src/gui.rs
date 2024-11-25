@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use eframe::{
-    egui::{self, CentralPanel, SidePanel, TopBottomPanel, ViewportBuilder},
+    egui::{self, CentralPanel, SidePanel, TopBottomPanel, ViewportBuilder, IconData},
     NativeOptions,
 };
 use rsnano_nullable_clock::SteadyClock;
@@ -9,8 +9,12 @@ use rsnano_nullable_clock::SteadyClock;
 use crate::{chat::ChatMessage, logic::RaffleLogic};
 
 pub(crate) fn run_gui(logic: Arc<Mutex<RaffleLogic>>, clock: Arc<SteadyClock>) -> eframe::Result {
+    let icon_data = load_icon();
+
     let options = NativeOptions {
-        viewport: ViewportBuilder::default().with_inner_size([800.0, 600.0]),
+        viewport: ViewportBuilder::default()
+            .with_inner_size([800.0, 600.0])
+            .with_icon(icon_data),
         ..Default::default()
     };
 
@@ -25,6 +29,20 @@ pub(crate) fn run_gui(logic: Arc<Mutex<RaffleLogic>>, clock: Arc<SteadyClock>) -
             }))
         }),
     )
+}
+
+fn load_icon() -> IconData {
+    let icon_image = image::open("assets/icon-256.png").expect("Unable to open icon PNG file");
+
+    let width = icon_image.width();
+    let height = icon_image.height();
+    let icon_rgba8 = icon_image.into_rgba8().to_vec();
+
+    IconData {
+        rgba: icon_rgba8,
+        width,
+        height,
+    }
 }
 
 #[derive(Default)]
