@@ -90,4 +90,4 @@ impl RaffleRunner {
     }
 }
 
-static DEFAULT_RAFFLE_INTERVAL: Duration = Duration::from_secs(60 * 5);
+static DEFAULT_RAFFLE_INTERVAL: Duration = Duration::from_secs(60 * 4);
