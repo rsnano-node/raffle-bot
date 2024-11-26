@@ -79,9 +79,10 @@ fn spawn_backend(
 
         let logic2 = logic.clone();
         let logic3 = logic.clone();
+        let clock2 = clock.clone();
         rt.spawn(async move { run_ticker(logic2, clock, priv_key).await });
 
-        rt.spawn(run_http_server(logic3));
+        rt.spawn(run_http_server(logic3, clock2));
 
         rt.block_on(async move {
             listen_to_chat(stream_url, move |msg| {
@@ -92,13 +93,13 @@ fn spawn_backend(
     });
 }
 
-async fn run_http_server(logic: Arc<Mutex<RaffleLogic>>) {
+async fn run_http_server(logic: Arc<Mutex<RaffleLogic>>, clock: Arc<SteadyClock>) {
     let app = Router::new()
         .route("/", get(get_html))
         .route("/raffle", get(get_raffle))
         .route("/confirm", post(post_confirm))
         .route("/overlay.svg", get(get_overlay))
-        .with_state(logic);
+        .with_state((logic, clock));
     let listener = TcpListener::bind("0.0.0.0:8080").await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
@@ -120,9 +121,11 @@ struct SpinInstruction {
     winner: usize,
 }
 
-async fn get_raffle(State(logic): State<Arc<Mutex<RaffleLogic>>>) -> Json<SpinInstruction> {
-    let guard = logic.lock().unwrap();
-
+async fn get_raffle(
+    State((logic, clock)): State<(Arc<Mutex<RaffleLogic>>, Arc<SteadyClock>)>,
+) -> Json<SpinInstruction> {
+    let mut guard = logic.lock().unwrap();
+    guard.ping(clock.now());
     if let Some(win) = guard.current_win() {
         let participants = win.participants.clone();
         let winner = participants.iter().position(|i| i == &win.winner).unwrap();
@@ -140,7 +143,7 @@ async fn get_raffle(State(logic): State<Arc<Mutex<RaffleLogic>>>) -> Json<SpinIn
     }
 }
 
-async fn post_confirm(State(logic): State<Arc<Mutex<RaffleLogic>>>) {
+async fn post_confirm(State((logic, _)): State<(Arc<Mutex<RaffleLogic>>, Arc<SteadyClock>)>) {
     let mut guard = logic.lock().unwrap();
     guard.spin_finished();
 }
@@ -152,15 +155,6 @@ async fn run_ticker(logic: Arc<Mutex<RaffleLogic>>, clock: Arc<SteadyClock>, pri
             .lock()
             .unwrap()
             .tick(clock.now(), thread_rng().next_u32());
-
-        if let Some(winner) = logic
-            .lock()
-            .unwrap()
-            .current_win()
-            .map(|w| w.winner.clone())
-        {
-            info!("CURRENT WINNER: {}", winner);
-        }
 
         for action in actions {
             match action {

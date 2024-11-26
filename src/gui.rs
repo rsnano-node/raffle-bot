@@ -38,6 +38,7 @@ impl eframe::App for AdminGui {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         ctx.request_repaint_after_secs(0.5);
         let mut logic = self.logic.lock().unwrap();
+        let now = self.clock.now();
 
         SidePanel::left("controls")
             .exact_width(200.0)
@@ -80,7 +81,16 @@ impl eframe::App for AdminGui {
                     }
                 }
                 if ui.button("run raffle now").clicked() {
-                    logic.run_raffle_now(self.clock.now());
+                    logic.run_raffle_now(now);
+                }
+                let connected = if logic.spinner_connected(now) {
+                    "ONLINE"
+                } else {
+                    "OFFLINE"
+                };
+                ui.label(format!("Spinner {}", connected));
+                if let Some(win) = logic.current_win() {
+                    ui.label(format!("CURRENT WINNER: {}", win.winner));
                 }
             });
 
@@ -96,10 +106,7 @@ impl eframe::App for AdminGui {
             });
 
         TopBottomPanel::top("timer-panel").show(ctx, |ui| {
-            ui.heading(format!(
-                "{}s until raffle",
-                logic.countdown(self.clock.now()).as_secs()
-            ));
+            ui.heading(format!("{}s until raffle", logic.countdown(now).as_secs()));
         });
 
         CentralPanel::default().show(ctx, |ui| {

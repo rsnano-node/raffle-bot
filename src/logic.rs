@@ -17,6 +17,7 @@ pub(crate) struct RaffleLogic {
     current_win: Option<RaffleResult>,
     spin_finished: bool,
     running: bool,
+    last_ping: Option<Timestamp>,
 }
 
 impl RaffleLogic {
@@ -67,6 +68,16 @@ impl RaffleLogic {
 
     pub fn prize(&self) -> Amount {
         self.raffle_runner.prize()
+    }
+
+    pub fn ping(&mut self, now: Timestamp) {
+        self.last_ping = Some(now);
+    }
+
+    pub fn spinner_connected(&self, now: Timestamp) -> bool {
+        self.last_ping
+            .map(|p| now - p < Duration::from_secs(3))
+            .unwrap_or_default()
     }
 
     pub fn current_win(&self) -> Option<&RaffleResult> {
