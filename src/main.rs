@@ -105,13 +105,13 @@ async fn run_http_server(logic: Arc<Mutex<RaffleLogic>>, clock: Arc<SteadyClock>
 }
 
 async fn get_html() -> Html<&'static str> {
-    Html(include_str!("index.html"))
+    Html(include_str!("../assets/index.html"))
 }
 
 async fn get_overlay() -> impl IntoResponse {
     let mut headers = HeaderMap::new();
     headers.insert(header::CONTENT_TYPE, "image/svg+xml".parse().unwrap());
-    (headers, include_str!("overlay.svg"))
+    (headers, include_str!("../assets/overlay.svg"))
 }
 
 #[derive(Serialize)]
