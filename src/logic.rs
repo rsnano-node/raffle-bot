@@ -2,7 +2,6 @@ use crate::{
     chat::{ChatMessage, LatestChatMessages},
     participants::{Participant, ParticipantRegistry},
     raffle_runner::{RaffleResult, RaffleRunner},
-    upcoming_raffle_announcement::UpcomingRaffleAnnouncement,
 };
 use rsnano_core::{Account, Amount};
 use rsnano_nullable_clock::Timestamp;
@@ -13,7 +12,6 @@ pub(crate) struct RaffleLogic {
     latest_messages: LatestChatMessages,
     participants: ParticipantRegistry,
     raffle_runner: RaffleRunner,
-    upcoming_raffle_announcement: UpcomingRaffleAnnouncement,
     current_win: Option<RaffleResult>,
     spin_finished: bool,
     running: bool,
@@ -135,14 +133,8 @@ impl RaffleLogic {
                 self.winners.push(win.winner.clone());
                 actions.extend(self.reward_winner(win));
                 self.spin_finished = false;
-                self.upcoming_raffle_announcement.raffle_completed();
             }
         }
-
-        actions.extend(
-            self.upcoming_raffle_announcement
-                .tick(self.raffle_runner.next_raffle(now), now),
-        );
 
         actions
     }
@@ -228,14 +220,16 @@ mod tests {
 
     #[test]
     fn tick_empty() {
-        let mut app = RaffleLogic::default();
-        let actions = app.tick(Timestamp::new_test_instance(), 1);
+        let mut logic = RaffleLogic::default();
+        logic.start();
+        let actions = logic.tick(Timestamp::new_test_instance(), 1);
         assert!(actions.is_empty());
     }
 
     #[test]
     fn pick_single_winner() {
         let mut logic = RaffleLogic::default();
+        logic.start();
         let start = Timestamp::new_test_instance();
         logic.tick(start, 0);
         let account = Account::from(42);
@@ -266,38 +260,5 @@ mod tests {
             })
         );
         assert!(logic.current_win().is_none());
-    }
-
-    #[test]
-    fn announce_next_raffle() {
-        let mut app = RaffleLogic::default();
-        let start = Timestamp::new_test_instance();
-        app.tick(start, 0);
-        let announce_time =
-            start + app.raffle_interval() - app.upcoming_raffle_announcement.offset();
-        assert!(app
-            .tick(announce_time - Duration::from_secs(1), 0)
-            .is_empty());
-        let actions = app.tick(announce_time, 0);
-        assert_eq!(actions.len(), 1);
-        assert_eq!(
-            actions[0],
-            Action::Notify("Get ready! The next raffle starts in 10 seconds...".to_owned())
-        );
-    }
-
-    #[test]
-    fn announce_only_once() {
-        let mut app = RaffleLogic::default();
-        let start = Timestamp::new_test_instance();
-        app.tick(start, 0);
-        let announce_time =
-            start + app.raffle_interval() - app.upcoming_raffle_announcement.offset();
-        let actions = app.tick(announce_time - Duration::from_secs(1), 0);
-        assert_eq!(actions.len(), 0);
-        let actions = app.tick(announce_time, 0);
-        assert_eq!(actions.len(), 1);
-        let actions = app.tick(announce_time + Duration::from_secs(1), 0);
-        assert_eq!(actions.len(), 0);
     }
 }
