@@ -28,6 +28,10 @@ pub(crate) struct RaffleResult {
 }
 
 impl RaffleRunner {
+    pub fn reset(&mut self) {
+        self.next_raffle = None;
+    }
+
     pub fn set_prize(&mut self, prize: Amount) {
         self.prize = prize;
     }

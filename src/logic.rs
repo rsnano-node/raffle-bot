@@ -16,9 +16,23 @@ pub(crate) struct RaffleLogic {
     upcoming_raffle_announcement: UpcomingRaffleAnnouncement,
     current_win: Option<RaffleResult>,
     spin_finished: bool,
+    running: bool,
 }
 
 impl RaffleLogic {
+    pub fn running(&self) -> bool {
+        self.running
+    }
+
+    pub fn start(&mut self) {
+        self.running = true;
+    }
+
+    pub fn stop(&mut self) {
+        self.running = false;
+        self.raffle_runner.reset();
+    }
+
     pub fn handle_chat_message(&mut self, message: ChatMessage) {
         for word in message.message.split_whitespace() {
             if let Ok(account) = Account::decode_account(word) {
@@ -72,6 +86,10 @@ impl RaffleLogic {
     }
 
     pub fn countdown(&mut self, now: Timestamp) -> Duration {
+        if !self.running {
+            return Duration::ZERO;
+        }
+
         let next = self.raffle_runner.next_raffle(now);
         if now >= next {
             Duration::ZERO
@@ -81,6 +99,10 @@ impl RaffleLogic {
     }
 
     pub fn tick(&mut self, now: Timestamp, random: u32) -> Vec<Action> {
+        if !self.running {
+            return Vec::new();
+        }
+
         let result = self
             .raffle_runner
             .try_run_raffle(&self.participants, now, random);

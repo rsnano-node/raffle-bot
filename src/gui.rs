@@ -58,6 +58,15 @@ impl eframe::App for AdminGui {
         });
 
         TopBottomPanel::bottom("chat-input").show(ctx, |ui| {
+            if logic.running() {
+                if ui.button("stop").clicked() {
+                    logic.stop();
+                }
+            } else {
+                if ui.button("start").clicked() {
+                    logic.start();
+                }
+            }
             ui.label("User:");
             ui.text_edit_singleline(&mut self.user);
             ui.label("Message:");
