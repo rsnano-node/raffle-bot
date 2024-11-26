@@ -94,6 +94,17 @@ impl eframe::App for AdminGui {
                 }
             });
 
+        SidePanel::right("winners-panel")
+            .exact_width(200.0)
+            .resizable(false)
+            .show(ctx, |ui| {
+                let winners = logic.winners();
+                ui.heading(format!("Winners ({})", winners.len()));
+                for winner in winners {
+                    ui.label(winner);
+                }
+            });
+
         SidePanel::right("viewers-panel")
             .exact_width(200.0)
             .resizable(false)

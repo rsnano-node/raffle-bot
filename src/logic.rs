@@ -18,6 +18,7 @@ pub(crate) struct RaffleLogic {
     spin_finished: bool,
     running: bool,
     last_ping: Option<Timestamp>,
+    winners: Vec<String>,
 }
 
 impl RaffleLogic {
@@ -96,6 +97,10 @@ impl RaffleLogic {
         self.participants.list()
     }
 
+    pub fn winners(&self) -> &Vec<String> {
+        &self.winners
+    }
+
     pub fn countdown(&mut self, now: Timestamp) -> Duration {
         if !self.running {
             return Duration::ZERO;
@@ -127,6 +132,7 @@ impl RaffleLogic {
 
         if self.spin_finished {
             if let Some(win) = self.current_win.take() {
+                self.winners.push(win.winner.clone());
                 actions.extend(self.reward_winner(win));
                 self.spin_finished = false;
                 self.upcoming_raffle_announcement.raffle_completed();
