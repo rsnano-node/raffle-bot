@@ -1,10 +1,10 @@
 mod chat;
-mod chat_listener;
 mod gui;
 mod logic;
 mod participants;
 mod prize_sender;
 mod raffle_runner;
+mod youtube_chat_listener;
 
 use std::{
     ffi::OsStr,
@@ -19,7 +19,6 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use chat_listener::listen_to_chat;
 use gui::run_gui;
 use log::{info, warn};
 use logic::{Action, RaffleLogic};
@@ -28,12 +27,16 @@ use rand::{thread_rng, RngCore};
 use rsnano_core::{Amount, PublicKey, RawKey};
 use rsnano_nullable_clock::SteadyClock;
 use serde::Serialize;
-use tokio::{net::TcpListener, process::Command, time::sleep};
+use tokio::{
+    net::TcpListener,
+    process::Command,
+    sync::oneshot::{self, Receiver},
+    time::sleep,
+};
+use youtube_chat_listener::listen_to_youtube_chat;
 
-fn main() -> eframe::Result {
+fn main() {
     env_logger::init();
-    let stream_url = std::env::var("STREAM_URL").unwrap();
-    info!("using stream url: {}", stream_url);
     let priv_key = std::env::var("NANO_PRV_KEY").unwrap();
     let priv_key = RawKey::decode_hex(priv_key).unwrap();
     info!(
@@ -60,35 +63,35 @@ fn main() -> eframe::Result {
     }
     let logic = Arc::new(Mutex::new(logic));
     let clock = Arc::new(SteadyClock::default());
-    spawn_backend(logic.clone(), clock.clone(), stream_url, priv_key);
-    run_gui(logic, clock)
+    let (tx_stop, rx_stop) = oneshot::channel::<()>();
+
+    std::thread::scope(|s| {
+        s.spawn(|| run_backend(&logic, &clock, priv_key, rx_stop));
+        run_gui(logic.clone(), clock.clone()).unwrap();
+        tx_stop.send(()).unwrap();
+    })
 }
 
-fn spawn_backend(
-    logic: Arc<Mutex<RaffleLogic>>,
-    clock: Arc<SteadyClock>,
-    stream_url: String,
+fn run_backend(
+    logic: &Arc<Mutex<RaffleLogic>>,
+    clock: &Arc<SteadyClock>,
     priv_key: RawKey,
+    stop: Receiver<()>,
 ) {
-    std::thread::spawn(move || {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap();
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
 
-        let logic2 = logic.clone();
-        let logic3 = logic.clone();
-        let clock2 = clock.clone();
-        rt.spawn(async move { run_ticker(logic2, clock, priv_key).await });
-
-        rt.spawn(run_http_server(logic3, clock2));
-
-        rt.block_on(async move {
-            listen_to_chat(stream_url, move |msg| {
+    rt.block_on(async {
+        tokio::select!(
+            _ = run_ticker(logic, clock, priv_key) => {},
+            _ = run_http_server(logic.clone(), clock.clone()) => {},
+            _ = listen_to_youtube_chat(|msg| {
                 logic.lock().unwrap().handle_chat_message(msg)
-            })
-            .await;
-        });
+            }) => {}
+            _ = stop =>{}
+        );
     });
 }
 
@@ -147,7 +150,7 @@ async fn post_confirm(State((logic, _)): State<(Arc<Mutex<RaffleLogic>>, Arc<Ste
     guard.spin_finished();
 }
 
-async fn run_ticker(logic: Arc<Mutex<RaffleLogic>>, clock: Arc<SteadyClock>, priv_key: RawKey) {
+async fn run_ticker(logic: &Mutex<RaffleLogic>, clock: &SteadyClock, priv_key: RawKey) {
     let prize_sender = PrizeSender::new(priv_key);
     loop {
         let actions = logic

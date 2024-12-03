@@ -5,7 +5,6 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.41.1", features = ["rt", "process"] }
-youtube_chat = "0.2.1"
 rsnano_core = {git = "https://github.com/rsnano-node/rsnano-node", branch="develop"}
 rsnano_nullable_random = {git = "https://github.com/rsnano-node/rsnano-node", branch="develop"}
 rsnano_nullable_clock = {git = "https://github.com/rsnano-node/rsnano-node", branch="develop"}
@@ -20,4 +19,6 @@ anyhow = "1.0.93"
 axum = "0.7.9"
 serde = "1.0.215"
 image = "0.25.5"
+gauth = "0.8.0"
+reqwest = "0.12.9"
 
