@@ -4,6 +4,7 @@ mod logic;
 mod participants;
 mod prize_sender;
 mod raffle_runner;
+mod twitch_chat_listener;
 mod youtube_chat_listener;
 
 use std::{
@@ -33,6 +34,7 @@ use tokio::{
     sync::oneshot::{self, Receiver},
     time::sleep,
 };
+use twitch_chat_listener::listen_to_twitch_chat;
 use youtube_chat_listener::listen_to_youtube_chat;
 
 fn main() {
@@ -87,6 +89,9 @@ fn run_backend(
         tokio::select!(
             _ = run_ticker(logic, clock, priv_key) => {},
             _ = run_http_server(logic.clone(), clock.clone()) => {},
+            _ = listen_to_twitch_chat(|msg| {
+                logic.lock().unwrap().handle_chat_message(msg)
+            }) => {}
             _ = listen_to_youtube_chat(|msg| {
                 logic.lock().unwrap().handle_chat_message(msg)
             }) => {}

@@ -142,6 +142,7 @@ impl YouTubeClient {
         .header(AUTHORIZATION, self.auth_token.clone())
         .send()
         .await?
+        .error_for_status()?
         .json()
         .await?;
         Ok(response)
@@ -160,6 +161,7 @@ impl YouTubeClient {
         .header(AUTHORIZATION, self.auth_token.clone())
         .send()
         .await?
+        .error_for_status()?
         .json()
         .await?;
         Ok(response)
