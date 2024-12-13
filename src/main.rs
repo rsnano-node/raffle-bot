@@ -10,6 +10,7 @@ mod twitch_chat_listener;
 mod youtube_chat_listener;
 
 use std::{
+    env,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -23,8 +24,11 @@ use rsnano_nullable_clock::SteadyClock;
 use tokio::sync::oneshot::{self};
 
 fn main() {
+    if env::var("RUST_LOG").is_err() {
+        env::set_var("RUST_LOG", "raffle_bot=debug")
+    }
     env_logger::init();
-    let priv_key = std::env::var("NANO_PRV_KEY").unwrap();
+    let priv_key = std::env::var("NANO_PRV_KEY").expect("env var NANO_PRV_KEY not set!");
     let priv_key = PrivateKey::from_hex_str(priv_key).unwrap();
     info!("using account: {}", priv_key.account().encode_account());
     let prize = std::env::var("NANO_PRIZE")

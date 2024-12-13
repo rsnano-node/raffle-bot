@@ -68,7 +68,10 @@ where
 
     assert!(!broadcasts.items.is_empty());
     let this_broadcast = &broadcasts.items[0];
-    assert_eq!(this_broadcast.status.life_cycle_status, "live");
+    if this_broadcast.status.life_cycle_status != "live" {
+        warn!("NO YOUTUBE LIVE STREAM FOUND!");
+        return;
+    }
 
     let mut page_token = String::new();
     let mut sleep_duration;
@@ -137,14 +140,16 @@ impl YouTubeClient {
     }
 
     async fn get_my_live_broadcasts(&self) -> anyhow::Result<LiveBroadcastsResponse> {
-        let response = self.http_client
-        .get("https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status&mine=true")
-        .header(AUTHORIZATION, self.auth_token.clone())
-        .send()
-        .await?
-        .error_for_status()?
-        .json()
-        .await?;
+        let response = self
+            .http_client
+            .get("https://www.googleapis.com/youtube/v3/liveBroadcasts")
+            .query(&[("part", "snippet,status"), ("mine", "true")])
+            .header(AUTHORIZATION, self.auth_token.clone())
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
         Ok(response)
     }
 
@@ -153,17 +158,20 @@ impl YouTubeClient {
         live_chat_id: impl AsRef<str>,
         page_token: impl AsRef<str>,
     ) -> anyhow::Result<MessageListResponse> {
-        let response=  self.http_client.get(format!(
-            "https://www.googleapis.com/youtube/v3/liveChat/messages?liveChatId={}&part=snippet,authorDetails&pageToken={}",
-            live_chat_id.as_ref(),
-            page_token.as_ref()
-        ))
-        .header(AUTHORIZATION, self.auth_token.clone())
-        .send()
-        .await?
-        .error_for_status()?
-        .json()
-        .await?;
+        let response = self
+            .http_client
+            .get("https://www.googleapis.com/youtube/v3/liveChat/messages")
+            .query(&[
+                ("liveChatId", live_chat_id.as_ref()),
+                ("part", "snippet,authorDetails"),
+                ("pageToken", page_token.as_ref()),
+            ])
+            .header(AUTHORIZATION, self.auth_token.clone())
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
         Ok(response)
     }
 }
