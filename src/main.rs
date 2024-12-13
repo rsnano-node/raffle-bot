@@ -4,6 +4,7 @@ mod gui;
 mod http_server;
 mod logic;
 mod participants;
+mod participants_file;
 mod prize_sender;
 mod raffle_runner;
 mod twitch_chat_listener;
@@ -19,6 +20,7 @@ use backend::run_backend;
 use gui::run_gui;
 use log::info;
 use logic::RaffleLogic;
+use participants_file::ParticipantsFile;
 use rsnano_core::{Amount, PrivateKey};
 use rsnano_nullable_clock::SteadyClock;
 use tokio::sync::oneshot::{self};
@@ -46,12 +48,14 @@ fn main() {
         info!("using interval of {}s", interval);
         logic.set_raffle_interval(Duration::from_secs(interval));
     }
+    let mut participants_file = ParticipantsFile::default();
+    logic.set_participants(participants_file.load());
     let logic = Arc::new(Mutex::new(logic));
     let clock = Arc::new(SteadyClock::default());
     let (tx_stop, rx_stop) = oneshot::channel::<()>();
 
     std::thread::scope(|s| {
-        s.spawn(|| run_backend(&logic, &clock, priv_key, rx_stop));
+        s.spawn(|| run_backend(&logic, &clock, priv_key, participants_file, rx_stop));
         run_gui(logic.clone(), clock.clone()).unwrap();
         tx_stop.send(()).unwrap();
     })

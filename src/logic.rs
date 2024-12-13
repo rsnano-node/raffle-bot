@@ -3,6 +3,7 @@ use crate::{
     participants::{Participant, ParticipantRegistry},
     raffle_runner::{RaffleResult, RaffleRunner},
 };
+
 use rsnano_core::{Account, Amount};
 use rsnano_nullable_clock::Timestamp;
 use std::time::Duration;
@@ -157,6 +158,10 @@ impl RaffleLogic {
         });
 
         vec![notify, send_prize]
+    }
+
+    pub(crate) fn set_participants(&mut self, participants: Vec<Participant>) {
+        self.participants.set(participants);
     }
 }
 

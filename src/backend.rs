@@ -2,6 +2,7 @@ use crate::{
     chat_messages::ChatMessage,
     http_server::run_http_server,
     logic::{Action, RaffleLogic},
+    participants_file::ParticipantsFile,
     prize_sender::PrizeSender,
     twitch_chat_listener::listen_to_twitch_chat,
     youtube_chat_listener::listen_to_youtube_chat,
@@ -21,6 +22,7 @@ pub(crate) fn run_backend(
     logic: &Arc<Mutex<RaffleLogic>>,
     clock: &Arc<SteadyClock>,
     priv_key: PrivateKey,
+    participants_file: ParticipantsFile,
     stop: Receiver<()>,
 ) {
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -30,16 +32,18 @@ pub(crate) fn run_backend(
 
     let logic_l = logic.clone();
     let handle_message = move |msg: ChatMessage| logic_l.lock().unwrap().handle_chat_message(msg);
-    let handle_message2 = handle_message.clone();
 
     runtime.block_on(async {
         let mut set = JoinSet::new();
-        let logic_l = logic.clone();
-        let clock_l = clock.clone();
-        set.spawn(async move { run_ticker(&logic_l, &clock_l, priv_key).await });
+        set.spawn(run_ticker(
+            logic.clone(),
+            clock.clone(),
+            participants_file,
+            priv_key,
+        ));
         set.spawn(run_http_server(logic.clone(), clock.clone()));
-        set.spawn(listen_to_twitch_chat(handle_message));
-        set.spawn(listen_to_youtube_chat(handle_message2));
+        set.spawn(listen_to_twitch_chat(handle_message.clone()));
+        set.spawn(listen_to_youtube_chat(handle_message));
 
         tokio::select!(
             _ = set.join_all() => {},
@@ -48,13 +52,24 @@ pub(crate) fn run_backend(
     });
 }
 
-async fn run_ticker(logic: &Mutex<RaffleLogic>, clock: &SteadyClock, priv_key: PrivateKey) {
+/// Periodically check logic for new things to do
+async fn run_ticker(
+    logic: Arc<Mutex<RaffleLogic>>,
+    clock: Arc<SteadyClock>,
+    mut participants_file: ParticipantsFile,
+    priv_key: PrivateKey,
+) {
     let prize_sender = PrizeSender::new(priv_key);
     loop {
-        let actions = logic
-            .lock()
-            .unwrap()
-            .tick(clock.now(), thread_rng().next_u32());
+        let participants;
+        let actions;
+        {
+            let mut guard = logic.lock().unwrap();
+            participants = guard.participants();
+            actions = guard.tick(clock.now(), thread_rng().next_u32())
+        };
+
+        participants_file.update(participants);
 
         for action in actions {
             match action {

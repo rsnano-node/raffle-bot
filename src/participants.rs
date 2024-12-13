@@ -1,7 +1,8 @@
 use rsnano_core::Account;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, Hash)]
 pub(crate) struct Participant {
     pub channel_id: String,
     pub name: String,
@@ -52,6 +53,12 @@ impl ParticipantRegistry {
 
         let mut all_participants = self.list();
         Some(all_participants.remove(random_val as usize % self.len()))
+    }
+
+    pub(crate) fn set(&mut self, participants: Vec<Participant>) {
+        for p in participants {
+            self.add(p);
+        }
     }
 }
 
