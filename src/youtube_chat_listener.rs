@@ -1,4 +1,4 @@
-use crate::chat::ChatMessage;
+use crate::chat_messages::ChatMessage;
 use gauth::app::Auth;
 use log::{debug, warn};
 use reqwest::header::AUTHORIZATION;

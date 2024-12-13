@@ -1,5 +1,5 @@
 use crate::{
-    chat::{ChatMessage, LatestChatMessages},
+    chat_messages::{ChatMessage, LatestChatMessages},
     participants::{Participant, ParticipantRegistry},
     raffle_runner::{RaffleResult, RaffleRunner},
 };

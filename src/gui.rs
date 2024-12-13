@@ -1,4 +1,4 @@
-use crate::{chat::ChatMessage, logic::RaffleLogic};
+use crate::{chat_messages::ChatMessage, logic::RaffleLogic};
 use eframe::{
     egui::{self, CentralPanel, IconData, SidePanel, TopBottomPanel, ViewportBuilder},
     NativeOptions,

@@ -1,5 +1,5 @@
 mod backend;
-mod chat;
+mod chat_messages;
 mod gui;
 mod http_server;
 mod logic;

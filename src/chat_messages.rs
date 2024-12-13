@@ -1,6 +1,5 @@
-use std::collections::VecDeque;
-
 use rsnano_core::Account;
+use std::collections::VecDeque;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ChatMessage {

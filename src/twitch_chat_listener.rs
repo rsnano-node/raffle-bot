@@ -4,7 +4,7 @@ use twitch_irc::{
     TwitchIRCClient,
 };
 
-use crate::chat::ChatMessage;
+use crate::chat_messages::ChatMessage;
 
 pub(crate) async fn listen_to_twitch_chat<F>(on_message: F)
 where
