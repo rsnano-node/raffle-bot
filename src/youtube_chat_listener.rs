@@ -1,6 +1,6 @@
 use crate::chat_messages::ChatMessage;
 use gauth::app::Auth;
-use log::{debug, warn};
+use log::{debug, error, info, warn};
 use reqwest::header::AUTHORIZATION;
 use serde::Deserialize;
 use std::time::Duration;
@@ -62,6 +62,7 @@ pub(crate) async fn listen_to_youtube_chat<F>(on_message: F)
 where
     F: Fn(ChatMessage) + Send + Sync,
 {
+    info!("Connecting to YouTube chat...");
     let token = get_auth_token().await.unwrap();
     let youtube_client = YouTubeClient::new(token.clone());
     let broadcasts = youtube_client.get_my_live_broadcasts().await.unwrap();
@@ -69,10 +70,11 @@ where
     assert!(!broadcasts.items.is_empty());
     let this_broadcast = &broadcasts.items[0];
     if this_broadcast.status.life_cycle_status != "live" {
-        warn!("NO YOUTUBE LIVE STREAM FOUND!");
+        error!("NO YOUTUBE LIVE STREAM FOUND!");
         return;
     }
 
+    info!("YouTube chat connected!");
     let mut page_token = String::new();
     let mut sleep_duration;
     loop {

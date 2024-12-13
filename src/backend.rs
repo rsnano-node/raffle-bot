@@ -1,4 +1,5 @@
 use crate::{
+    chat_messages::ChatMessage,
     http_server::run_http_server,
     logic::{Action, RaffleLogic},
     prize_sender::PrizeSender,
@@ -14,7 +15,7 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-use tokio::{process::Command, sync::oneshot::Receiver, time::sleep};
+use tokio::{process::Command, sync::oneshot::Receiver, task::JoinSet, time::sleep};
 
 pub(crate) fn run_backend(
     logic: &Arc<Mutex<RaffleLogic>>,
@@ -22,21 +23,26 @@ pub(crate) fn run_backend(
     priv_key: PrivateKey,
     stop: Receiver<()>,
 ) {
-    let rt = tokio::runtime::Builder::new_current_thread()
+    let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
 
-    rt.block_on(async {
+    let logic_l = logic.clone();
+    let handle_message = move |msg: ChatMessage| logic_l.lock().unwrap().handle_chat_message(msg);
+    let handle_message2 = handle_message.clone();
+
+    runtime.block_on(async {
+        let mut set = JoinSet::new();
+        let logic_l = logic.clone();
+        let clock_l = clock.clone();
+        set.spawn(async move { run_ticker(&logic_l, &clock_l, priv_key).await });
+        set.spawn(run_http_server(logic.clone(), clock.clone()));
+        set.spawn(listen_to_twitch_chat(handle_message));
+        set.spawn(listen_to_youtube_chat(handle_message2));
+
         tokio::select!(
-            _ = run_ticker(logic, clock, priv_key) => {},
-            _ = run_http_server(logic.clone(), clock.clone()) => {},
-            _ = listen_to_twitch_chat(|msg| {
-                logic.lock().unwrap().handle_chat_message(msg)
-            }) => {}
-            _ = listen_to_youtube_chat(|msg| {
-                logic.lock().unwrap().handle_chat_message(msg)
-            }) => {}
+            _ = set.join_all() => {},
             _ = stop =>{}
         );
     });
