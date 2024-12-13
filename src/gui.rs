@@ -1,6 +1,6 @@
 use crate::{chat::ChatMessage, logic::RaffleLogic};
 use eframe::{
-    egui::{self, CentralPanel, SidePanel, TopBottomPanel, ViewportBuilder, IconData},
+    egui::{self, CentralPanel, IconData, SidePanel, TopBottomPanel, ViewportBuilder},
     NativeOptions,
 };
 use rsnano_nullable_clock::SteadyClock;
@@ -66,11 +66,10 @@ impl eframe::App for AdminGui {
                     if ui.button("stop").clicked() {
                         logic.stop();
                     }
-                } else {
-                    if ui.button("start").clicked() {
-                        logic.start();
-                    }
+                } else if ui.button("start").clicked() {
+                    logic.start();
                 }
+
                 ui.label("User:");
                 ui.text_edit_singleline(&mut self.user);
                 ui.label("Message:");

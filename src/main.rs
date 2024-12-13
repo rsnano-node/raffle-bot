@@ -18,21 +18,15 @@ use backend::run_backend;
 use gui::run_gui;
 use log::info;
 use logic::RaffleLogic;
-use rsnano_core::{Amount, PublicKey, RawKey};
+use rsnano_core::{Amount, PrivateKey};
 use rsnano_nullable_clock::SteadyClock;
 use tokio::sync::oneshot::{self};
 
 fn main() {
     env_logger::init();
     let priv_key = std::env::var("NANO_PRV_KEY").unwrap();
-    let priv_key = RawKey::decode_hex(priv_key).unwrap();
-    info!(
-        "using account: {}",
-        PublicKey::try_from(&priv_key)
-            .unwrap()
-            .as_account()
-            .encode_account()
-    );
+    let priv_key = PrivateKey::from_hex_str(priv_key).unwrap();
+    info!("using account: {}", priv_key.account().encode_account());
     let prize = std::env::var("NANO_PRIZE")
         .ok()
         .map(|s| Amount::decode_dec(s).unwrap());

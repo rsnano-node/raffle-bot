@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use log::info;
 use rsnano_core::{
     work::{WorkPool, WorkPoolImpl, WorkThresholds},
-    Account, Amount, Block, KeyPair, RawKey, StateBlock,
+    Account, Amount, Block, PrivateKey, StateBlockArgs,
 };
 use rsnano_rpc_client::NanoRpcClient;
 use rsnano_rpc_messages::{AccountInfoArgs, BlockSubTypeDto, ProcessArgs};
@@ -10,14 +10,12 @@ use std::time::Duration;
 use tokio::task::spawn_blocking;
 
 pub(crate) struct PrizeSender {
-    sender_keys: KeyPair,
+    sender_key: PrivateKey,
 }
 
 impl PrizeSender {
-    pub(crate) fn new(prv_key: RawKey) -> Self {
-        Self {
-            sender_keys: KeyPair::from(prv_key),
-        }
+    pub(crate) fn new(sender_key: PrivateKey) -> Self {
+        Self { sender_key }
     }
 
     pub(crate) async fn send_prize(
@@ -28,7 +26,7 @@ impl PrizeSender {
         let rpc = NanoRpcClient::new("http://[::1]:7076".parse()?);
         let info = rpc
             .account_info(
-                AccountInfoArgs::build(self.sender_keys.account())
+                AccountInfoArgs::build(self.sender_key.account())
                     .include_representative()
                     .finish(),
             )
@@ -46,17 +44,18 @@ impl PrizeSender {
         })
         .await?;
 
-        let block = Block::State(StateBlock::new(
-            self.sender_keys.account(),
-            info.frontier,
-            info.representative
+        let block: Block = StateBlockArgs {
+            key: &self.sender_key,
+            previous: info.frontier,
+            representative: info
+                .representative
                 .ok_or_else(|| anyhow!("no rep field!"))?
                 .into(),
-            info.balance - prize,
-            destination.into(),
-            &self.sender_keys,
+            balance: info.balance - prize,
+            link: destination.into(),
             work,
-        ));
+        }
+        .into();
 
         let args = ProcessArgs::build(block.json_representation())
             .subtype(BlockSubTypeDto::Send)

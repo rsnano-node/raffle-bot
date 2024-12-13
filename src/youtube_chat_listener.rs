@@ -66,7 +66,7 @@ where
     let youtube_client = YouTubeClient::new(token.clone());
     let broadcasts = youtube_client.get_my_live_broadcasts().await.unwrap();
 
-    assert!(broadcasts.items.len() > 0);
+    assert!(!broadcasts.items.is_empty());
     let this_broadcast = &broadcasts.items[0];
     assert_eq!(this_broadcast.status.life_cycle_status, "live");
 

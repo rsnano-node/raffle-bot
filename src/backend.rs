@@ -7,7 +7,7 @@ use crate::{
 };
 use log::{info, warn};
 use rand::{thread_rng, RngCore};
-use rsnano_core::RawKey;
+use rsnano_core::PrivateKey;
 use rsnano_nullable_clock::SteadyClock;
 use std::{
     ffi::OsStr,
@@ -19,7 +19,7 @@ use tokio::{process::Command, sync::oneshot::Receiver, time::sleep};
 pub(crate) fn run_backend(
     logic: &Arc<Mutex<RaffleLogic>>,
     clock: &Arc<SteadyClock>,
-    priv_key: RawKey,
+    priv_key: PrivateKey,
     stop: Receiver<()>,
 ) {
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -42,7 +42,7 @@ pub(crate) fn run_backend(
     });
 }
 
-async fn run_ticker(logic: &Mutex<RaffleLogic>, clock: &SteadyClock, priv_key: RawKey) {
+async fn run_ticker(logic: &Mutex<RaffleLogic>, clock: &SteadyClock, priv_key: PrivateKey) {
     let prize_sender = PrizeSender::new(priv_key);
     loop {
         let actions = logic
