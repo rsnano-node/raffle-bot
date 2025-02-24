@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use anyhow::anyhow;
 use log::info;
@@ -6,7 +9,9 @@ use rsnano_core::{Account, Amount, Block, PrivateKey, StateBlockArgs};
 use rsnano_rpc_client::NanoRpcClient;
 use rsnano_rpc_messages::{AccountInfoArgs, BlockSubTypeDto, ProcessArgs};
 use rsnano_work::WorkPool;
-use tokio::task::spawn_blocking;
+use tokio::{task::spawn_blocking, time::sleep};
+
+const MIN_DELAY: Duration = Duration::from_secs(15);
 
 pub(crate) struct PrizeSender {
     sender_key: PrivateKey,
@@ -36,6 +41,7 @@ impl PrizeSender {
             )
             .await?;
 
+        let start = Instant::now();
         let work_pool = self.work_pool.clone();
         let work = spawn_blocking(move || {
             info!("Starting with PoW generation");
@@ -46,6 +52,11 @@ impl PrizeSender {
             work
         })
         .await?;
+
+        let elapsed = start.elapsed();
+        if elapsed < MIN_DELAY {
+            sleep(MIN_DELAY - elapsed).await;
+        }
 
         let block: Block = StateBlockArgs {
             key: &self.sender_key,
