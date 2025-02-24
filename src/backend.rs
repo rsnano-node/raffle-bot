@@ -8,7 +8,7 @@ use crate::{
     youtube_chat_listener::listen_to_youtube_chat,
 };
 use log::{info, warn};
-use rand::{thread_rng, RngCore};
+use rand::{rng, RngCore};
 use rsnano_core::PrivateKey;
 use rsnano_nullable_clock::SteadyClock;
 use std::{
@@ -66,7 +66,7 @@ async fn run_ticker(
         {
             let mut guard = logic.lock().unwrap();
             participants = guard.participants();
-            actions = guard.tick(clock.now(), thread_rng().next_u32())
+            actions = guard.tick(clock.now(), rng().next_u32())
         };
 
         participants_file.update(participants);

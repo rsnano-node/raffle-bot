@@ -1,21 +1,25 @@
+use std::sync::Arc;
+
 use anyhow::anyhow;
 use log::info;
-use rsnano_core::{
-    work::{WorkPool, WorkPoolImpl, WorkThresholds},
-    Account, Amount, Block, PrivateKey, StateBlockArgs,
-};
+use rsnano_core::{Account, Amount, Block, PrivateKey, StateBlockArgs};
 use rsnano_rpc_client::NanoRpcClient;
 use rsnano_rpc_messages::{AccountInfoArgs, BlockSubTypeDto, ProcessArgs};
-use std::time::Duration;
+use rsnano_work::WorkPool;
 use tokio::task::spawn_blocking;
 
 pub(crate) struct PrizeSender {
     sender_key: PrivateKey,
+    work_pool: Arc<WorkPool>,
 }
 
 impl PrizeSender {
     pub(crate) fn new(sender_key: PrivateKey) -> Self {
-        Self { sender_key }
+        let work_pool = WorkPool::builder().gpu_only().finish();
+        Self {
+            sender_key,
+            work_pool: work_pool.into(),
+        }
     }
 
     pub(crate) async fn send_prize(
@@ -32,10 +36,9 @@ impl PrizeSender {
             )
             .await?;
 
+        let work_pool = self.work_pool.clone();
         let work = spawn_blocking(move || {
             info!("Starting with PoW generation");
-            let work_pool =
-                WorkPoolImpl::new(WorkThresholds::publish_full().clone(), 4, Duration::ZERO);
             let work = work_pool
                 .generate(info.frontier.into(), work_pool.threshold_base())
                 .unwrap();

@@ -4,22 +4,23 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tokio = { version = "1.41.1", features = ["rt", "process"] }
+tokio = { version = "1.43.0", features = ["rt", "process"] }
 rsnano_core = {git = "https://github.com/rsnano-node/rsnano-node", branch="develop"}
+rsnano_work = {git = "https://github.com/rsnano-node/rsnano-node", branch="develop", features = ["opencl"]}
 rsnano_nullable_random = {git = "https://github.com/rsnano-node/rsnano-node", branch="develop"}
 rsnano_nullable_clock = {git = "https://github.com/rsnano-node/rsnano-node", branch="develop"}
 rsnano_rpc_messages = {git = "https://github.com/rsnano-node/rsnano-node", branch="develop"}
 rsnano_rpc_client = {git = "https://github.com/rsnano-node/rsnano-node", branch="develop"}
-rand = "0.8.5"
-eframe = "0.29.1"
-serde_json = "1.0.133"
-env_logger = "0.11.5"
-log = "0.4.22"
-anyhow = "1.0.93"
-axum = "0.7.9"
-serde = "1.0.215"
+rand = "0.9.0"
+eframe = "0.31.0"
+serde_json = "1.0.139"
+env_logger = "0.11.6"
+log = "0.4.26"
+anyhow = "1.0.96"
+axum = "0.8.1"
+serde = "1.0.218"
 image = "0.25.5"
 gauth = "0.8.0"
-reqwest = "0.12.9"
+reqwest = "0.12.12"
 twitch-irc = "5.0.1"
 
