@@ -45,9 +45,7 @@ impl PrizeSender {
         let work_pool = self.work_pool.clone();
         let work = spawn_blocking(move || {
             info!("Starting with PoW generation");
-            let work = work_pool
-                .generate(info.frontier.into(), work_pool.threshold_base())
-                .unwrap();
+            let work = work_pool.generate_send(info.frontier.into()).unwrap();
             info!("PoW generation finished");
             work
         })
